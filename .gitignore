@@ -1,7 +1,3 @@
-# mume_emu cfg files
-pandora.cfg
-mmapper.cfg
-
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
