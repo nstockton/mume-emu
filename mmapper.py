@@ -212,10 +212,9 @@ def read_exit(infileobj):
 		new_exit.exitFlags.add("exit")
 		if not new_exit.door:
 			new_exit.door = "exit"
-	inConnections = []
+	# Inbound connections are unneeded.
 	connection = read_uint32(infileobj)
 	while connection != UINT_MAX:
-		inConnections.append(str(connection))
 		connection = read_uint32(infileobj)
 	outConnections = []
 	connection = read_uint32(infileobj)
@@ -224,11 +223,9 @@ def read_exit(infileobj):
 		connection = read_uint32(infileobj)
 	if not outConnections:
 		new_exit.to = "UNDEFINED"
-	elif len(outConnections) == 1:
-		new_exit.to = outConnections[0]
 	else:
-		intersections = list(set(outConnections).intersection(set(inConnections)))
-		new_exit.to = intersections[0] if intersections else outConnections[0]
+		# We want the last outbound connection.
+		new_exit.to = outConnections[-1]
 	return new_exit
 
 
