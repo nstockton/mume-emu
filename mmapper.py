@@ -11,6 +11,7 @@ from rooms import Room, Exit
 
 MMAPPER_MAGIC = 0xffb2af01
 MMAPPER_VERSION = 031
+UINT_MAX = 0xffffffff
 
 
 class MMapperException(Exception):
@@ -194,7 +195,7 @@ def read_int8(infileobj):
 
 def read_qstring(infileobj):
 	length = read_uint32(infileobj)
-	if length == 0xffffffff:
+	if length == UINT_MAX:
 		return ""
 	ucs_data = infileobj.read(length)
 	if len(ucs_data) != length:
@@ -213,12 +214,12 @@ def read_exit(infileobj):
 			new_exit.door = "exit"
 	inConnections = []
 	connection = read_uint32(infileobj)
-	while connection != 0xffffffff:
+	while connection != UINT_MAX:
 		inConnections.append(str(connection))
 		connection = read_uint32(infileobj)
 	outConnections = []
 	connection = read_uint32(infileobj)
-	while connection != 0xffffffff:
+	while connection != UINT_MAX:
 		outConnections.append(str(connection))
 		connection = read_uint32(infileobj)
 	if not outConnections:
