@@ -81,10 +81,10 @@ class World(object):
 					# Now that the direction and door names have been added to the doors list, we will enclose the direction in brackets '[]' for use in the exits line. In Mume, enclosing an exits line direction in brackets denotes a closed door in that direction.
 					direction = "[%s]" % direction
 			# The next 2 are just convenience symbols for denoting if the exit is to an undefined room or a known deathtrap.  They aren't used in Mume. The '=' signs are used in Mume to denote that the room in that direction is a road though.
-			if to not in self.rooms or to=="UNDEFINED":
-				direction = "??%s??" % direction
-			elif to == "DEATH":
+			if to == "DEATH":
 				direction = "!!%s!!" % direction
+			elif to not in self.rooms or to=="UNDEFINED":
+				direction = "??%s??" % direction
 			elif getattr(self.rooms[to], "terrain") == "ROAD":
 				direction = "=%s=" % direction
 			# Now that we are done manipulating the direction string, we'll add it to the exits list.
@@ -127,11 +127,11 @@ class World(object):
 
 	def setRoom(self, roomID):
 		"""Sets the reference to the current room to the room object with roomID"""
-		if roomID not in self.rooms:
-			roomID = "UNDEFINED"
 		# UNDEFINED and DEATH aren't actual rooms in the database, they are just attributes of an exit.  We will therefore return "UNDEFINED" or "DEATH"
 		if roomID=="UNDEFINED" or roomID=="DEATH":
 			return roomID
+		elif roomID not in self.rooms:
+			return "UNDEFINED"
 		self.room = self.rooms[roomID]
 		self.config["last_id"] = roomID
 
