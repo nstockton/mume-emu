@@ -3,6 +3,4 @@ mume-emu
 
 Off line emulation of the Mume world for safe exploration.
 
-To use, try one of the following:
-python2 mume_emu.py -c mmapper.cfg -m arda.mm2
-python2 mume_emu.py -c pandora.cfg -p arda.xml
+This project has been merged into [my TinTin scripts repository](https://github.com/nstockton/tintin-mume "TinTin-Mume"). Please use the startemulation.py script in TinTin-Mume to virtually explore the Mume world. This repository is now deprecated, and has been left up here for historical reference only.
