@@ -6,6 +6,7 @@ import cStringIO
 import struct
 import zlib
 
+from jd2gcal import jd2gcal
 from rooms import Room, Exit
 
 
@@ -53,6 +54,7 @@ class MMapperData(object):
 	# Fields: rooms, selected (a position)
 	def __init__(self):
 		self.rooms = {}
+		self.marks = []
 
 
 mobflags = NamedBitFlags([
@@ -115,6 +117,12 @@ align_type = {
 	1: "good",
 	2: "neutral",
 	3: "evil"}
+
+info_mark_type = {
+	0: "text",
+	1: "line",
+	2: "arrow"
+}
 
 light_type = {
 	0: "undefined",
@@ -262,6 +270,39 @@ def read_room(infileobj):
 	return new_room
 
 
+class InfoMark(object):
+	pass
+
+
+def read_mark(infileobj):
+	mark = InfoMark()
+	mark.name = read_qstring(infileobj)
+	mark.text = read_qstring(infileobj)
+	jd = read_uint32(infileobj) # Julian day number
+	if jd == 0:
+		# QDate objects don't have a year 0.
+		jd = None
+	ms = read_uint32(infileobj) # Milliseconds since midnight
+	if ms == UINT_MAX:
+		ms = None
+	tz = read_uint8(infileobj) # 0 = local time, 1 = UTC
+	if tz == 0xff:
+		tz = None
+	mark.datetime = jd2gcal(jd, ms, tz)
+	mark.type = info_mark_type[read_uint8(infileobj)]
+	mark.pos1 = {
+		"x": read_int32(infileobj),
+		"y": read_int32(infileobj),
+		"z": read_int32(infileobj)
+	}
+	mark.pos2 = {
+		"x": read_int32(infileobj),
+		"y": read_int32(infileobj),
+		"z": read_int32(infileobj)
+	}
+	return mark
+
+
 def decompress_mmapper_data(infileobj):
 	BLOCK_SIZE = 8192
 	decompressor = zlib.decompressobj()
@@ -290,9 +331,9 @@ def read_mmapper_data(filename):
 	for i in xrange(rooms_count):
 		room = read_room(decompressed_stream)
 		data.rooms[room.id] = room
-	#  for i in xrange(marks_count):
-	#    data.mark_list.append(read_mark(decompressed_stream))
-	# Do we want the marks?  How do they work, exactly?
+	for i in xrange(marks_count):
+		data.marks.append(read_mark(decompressed_stream))
+		# Do we want the marks?  How do they work, exactly?
 	return data
 
 
