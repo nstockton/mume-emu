@@ -11,7 +11,7 @@ from rooms import Room, Exit
 
 
 MMAPPER_MAGIC = 0xffb2af01
-MMAPPER_VERSION = 031
+MMAPPER_VERSIONS = (031, 040, 041)
 UINT_MAX = 0xffffffff
 
 
@@ -100,7 +100,10 @@ exitflags = NamedBitFlags([
 	("climb", 4),
 	("random", 5),
 	("special", 6),
-	("no_match", 7)])
+	("no_match", 7),
+	("flow", 8),
+	("no_flee", 9)
+])
 
 doorflags = NamedBitFlags([
 	("hidden", 1),
@@ -109,8 +112,11 @@ doorflags = NamedBitFlags([
 	("nobreak", 4),
 	("nopick", 5),
 	("delayed", 6),
-	("reserved1", 7),
-	("reserved2", 8)])
+	("callable", 7),
+	("knockable", 8),
+	("magic", 9),
+	("action", 10)
+])
 
 align_type = {
 	0: "undefined",
@@ -122,6 +128,19 @@ info_mark_type = {
 	0: "text",
 	1: "line",
 	2: "arrow"
+}
+
+info_mark_class = {
+	0: "generic",
+	1: "herb",
+	2: "river",
+	3: "place",
+	4: "mob",
+	5: "comment",
+	6: "road",
+	7: "object",
+	8: "action",
+	9: "locality"
 }
 
 light_type = {
@@ -138,6 +157,11 @@ ridable_type = {
 	0: "undefined",
 	1: "ridable",
 	2: "notridable"}
+
+sundeath_type = {
+	0: "undefined",
+	1: "sundeath",
+	2: "nosundeath"}
 
 terrain_type = {
 	0: "UNDEFINED",
@@ -211,10 +235,16 @@ def read_qstring(infileobj):
 	return ucs_data.decode("UTF_16_BE")
 
 
-def read_exit(infileobj):
+def read_exit(version, infileobj):
 	new_exit = Exit()
-	new_exit.exitFlags = exitflags.bits_to_flag_set(read_uint8(infileobj))
-	new_exit.doorFlags = doorflags.bits_to_flag_set(read_uint8(infileobj))
+	if version >= 041:
+		new_exit.exitFlags = exitflags.bits_to_flag_set(read_uint16(infileobj))
+	else:
+		new_exit.exitFlags = exitflags.bits_to_flag_set(read_uint8(infileobj))
+	if version >= 040:
+		new_exit.doorFlags = doorflags.bits_to_flag_set(read_uint16(infileobj))
+	else:
+		new_exit.doorFlags = doorflags.bits_to_flag_set(read_uint8(infileobj))
 	new_exit.door = read_qstring(infileobj)
 	if "door" in new_exit.exitFlags:
 		new_exit.exitFlags.add("exit")
@@ -237,18 +267,18 @@ def read_exit(infileobj):
 	return new_exit
 
 
-def read_exits(infileobj):
+def read_exits(version, infileobj):
 	exits = []
 	exit_names = ["north", "south", "east", "west", "up", "down", "unknown"]
 	for exit_name in exit_names:
-		new_exit = read_exit(infileobj)
+		new_exit = read_exit(version, infileobj)
 		if new_exit.exitFlags:
 			new_exit.dir = exit_name
 			exits.append(new_exit)
 	return exits
 
 
-def read_room(infileobj):
+def read_room(version, infileobj):
 	new_room = Room()
 	new_room.name = read_qstring(infileobj)
 	new_room.desc = read_qstring(infileobj)
@@ -259,22 +289,30 @@ def read_room(infileobj):
 	new_room.light = light_type[read_uint8(infileobj)]
 	new_room.align = align_type[read_uint8(infileobj)]
 	new_room.portable = portable_type[read_uint8(infileobj)]
-	new_room.ridable = ridable_type[read_uint8(infileobj)]
-	new_room.mobFlags = mobflags.bits_to_flag_set(read_uint16(infileobj))
-	new_room.loadFlags = loadflags.bits_to_flag_set(read_uint16(infileobj))
+	if version >= 030:
+		new_room.ridable = ridable_type[read_uint8(infileobj)]
+	if version >= 041:
+		new_room.sundeath = sundeath_type[read_uint8(infileobj)]
+		new_room.mobFlags = mobflags.bits_to_flag_set(read_uint32(infileobj))
+		new_room.loadFlags = loadflags.bits_to_flag_set(read_uint32(infileobj))
+	else:
+		new_room.mobFlags = mobflags.bits_to_flag_set(read_uint16(infileobj))
+		new_room.loadFlags = loadflags.bits_to_flag_set(read_uint16(infileobj))
 	new_room.updated = bool(read_uint8(infileobj))
 	new_room.x = read_int32(infileobj)
 	new_room.y = read_int32(infileobj)
 	new_room.z = read_int32(infileobj)
-	new_room.exits = read_exits(infileobj) #[x for x in read_exits(infileobj)]
+	new_room.exits = read_exits(version, infileobj) #[x for x in read_exits(version, infileobj)]
 	return new_room
 
 
 class InfoMark(object):
-	pass
+	type = "text"
+	cls = "generic"
+	rotation_angle = 0.0
 
 
-def read_mark(infileobj):
+def read_mark(version, infileobj):
 	mark = InfoMark()
 	mark.name = read_qstring(infileobj)
 	mark.text = read_qstring(infileobj)
@@ -288,8 +326,11 @@ def read_mark(infileobj):
 	tz = read_uint8(infileobj) # 0 = local time, 1 = UTC
 	if tz == 0xff:
 		tz = None
-	mark.datetime = jd2gcal(jd, ms, tz)
+	mark.time_stamp = jd2gcal(jd, ms, tz)
 	mark.type = info_mark_type[read_uint8(infileobj)]
+	if version >= 040:
+		mark.cls = info_mark_class[read_uint8(infileobj)]
+		mark.rotation_angle = read_uint32(infileobj) / 100.0
 	mark.pos1 = {
 		"x": read_int32(infileobj),
 		"y": read_int32(infileobj),
@@ -320,19 +361,20 @@ def read_mmapper_data(filename):
 		num = read_uint32(infileobj)
 		if num != MMAPPER_MAGIC:
 			raise BadMagicNumberException()
-		num = read_int32(infileobj)
-		if num != MMAPPER_VERSION:
-			raise UnsupportedVersionException(num)
+		version = read_int32(infileobj)
+		if version not in MMAPPER_VERSIONS:
+			raise UnsupportedVersionException(version)
 		decompressed_stream = decompress_mmapper_data(infileobj)
 	data = MMapperData()
+	data.version = version
 	rooms_count = read_uint32(decompressed_stream)
 	marks_count = read_uint32(decompressed_stream)
 	data.selected = (read_int32(decompressed_stream), read_int32(decompressed_stream), read_int32(decompressed_stream))
 	for i in xrange(rooms_count):
-		room = read_room(decompressed_stream)
+		room = read_room(version, decompressed_stream)
 		data.rooms[room.id] = room
 	for i in xrange(marks_count):
-		data.marks.append(read_mark(decompressed_stream))
+		data.marks.append(read_mark(version, decompressed_stream))
 		# Do we want the marks?  How do they work, exactly?
 	return data
 
@@ -345,9 +387,9 @@ class Database(object):
 			num = read_uint32(infileobj)
 			if num != MMAPPER_MAGIC:
 				raise BadMagicNumberException()
-			num = read_int32(infileobj)
-			if num != MMAPPER_VERSION:
-				raise UnsupportedVersionException(num)
+			version = read_int32(infileobj)
+			if version not in MMAPPER_VERSIONS:
+				raise UnsupportedVersionException(version)
 			decompressedStream = decompress_mmapper_data(infileobj)
 		roomsCount = read_uint32(decompressedStream)
 		marksCount = read_uint32(decompressedStream)
@@ -356,7 +398,7 @@ class Database(object):
 		deathIDs = []
 		self.rooms = {}
 		for i in xrange(roomsCount):
-			newRoom = read_room(decompressedStream)
+			newRoom = read_room(version, decompressedStream)
 			if newRoom.terrain == "DEATH":
 				deathIDs.append(newRoom.id)
 			else:
