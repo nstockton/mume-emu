@@ -332,13 +332,13 @@ def read_mark(version, infileobj):
 		mark.cls = info_mark_class[read_uint8(infileobj)]
 		mark.rotation_angle = read_uint32(infileobj) / 100.0
 	mark.pos1 = {
-		"x": read_int32(infileobj),
-		"y": read_int32(infileobj),
+		"x": read_int32(infileobj) / 100.0,
+		"y": read_int32(infileobj) / 100.0,
 		"z": read_int32(infileobj)
 	}
 	mark.pos2 = {
-		"x": read_int32(infileobj),
-		"y": read_int32(infileobj),
+		"x": read_int32(infileobj) / 100.0,
+		"y": read_int32(infileobj) / 100.0,
 		"z": read_int32(infileobj)
 	}
 	return mark
