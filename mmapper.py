@@ -11,7 +11,7 @@ from rooms import Room, Exit
 
 
 MMAPPER_MAGIC = 0xffb2af01
-MMAPPER_VERSIONS = (031, 040, 041)
+MMAPPER_VERSIONS = (031, 040, 041, 042)
 UINT_MAX = 0xffffffff
 
 
@@ -344,7 +344,14 @@ def read_mark(version, infileobj):
 	return mark
 
 
-def decompress_mmapper_data(infileobj):
+def decompress_mmapper_data(version, infileobj):
+	if version >= 042:
+		# As of version 042 of the MMapper data format, MMapper uses qCompress and qUncompress from the QByteArray class for data compression.
+		# From the web page at
+		# https://doc.qt.io/archives/qt-5.7/qbytearray.html#qUncompress
+		# "Note: If you want to use this function to uncompress external data that was compressed using zlib, you first need to prepend a four byte header to the byte array containing the data. The header must contain the expected length (in bytes) of the uncompressed data, expressed as an unsigned, big-endian, 32-bit integer."
+		# We can therefore assume that MMapper data files with version 042 or later are compressed using standard zlib with a non-standard 4-byte header.
+		header = read_uint32(infileobj)
 	BLOCK_SIZE = 8192
 	decompressor = zlib.decompressobj()
 	decompressed_stream = cStringIO.StringIO()
@@ -364,7 +371,7 @@ def read_mmapper_data(filename):
 		version = read_int32(infileobj)
 		if version not in MMAPPER_VERSIONS:
 			raise UnsupportedVersionException(version)
-		decompressed_stream = decompress_mmapper_data(infileobj)
+		decompressed_stream = decompress_mmapper_data(version, infileobj)
 	data = MMapperData()
 	data.version = version
 	rooms_count = read_uint32(decompressed_stream)
@@ -373,6 +380,9 @@ def read_mmapper_data(filename):
 	for i in xrange(rooms_count):
 		room = read_room(version, decompressed_stream)
 		data.rooms[room.id] = room
+	if version >= 042:
+		# Reading marks are broken in V042 of the database format. Will need to look into this.
+		return data
 	for i in xrange(marks_count):
 		data.marks.append(read_mark(version, decompressed_stream))
 		# Do we want the marks?  How do they work, exactly?
@@ -390,7 +400,7 @@ class Database(object):
 			version = read_int32(infileobj)
 			if version not in MMAPPER_VERSIONS:
 				raise UnsupportedVersionException(version)
-			decompressedStream = decompress_mmapper_data(infileobj)
+			decompressedStream = decompress_mmapper_data(version, infileobj)
 		roomsCount = read_uint32(decompressedStream)
 		marksCount = read_uint32(decompressedStream)
 		self.selected = (read_int32(decompressedStream), read_int32(decompressedStream), read_int32(decompressedStream))
