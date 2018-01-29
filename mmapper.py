@@ -10,9 +10,10 @@ from jd2gcal import jd2gcal
 from rooms import Room, Exit
 
 
+UINT8_MAX = 0xff
+UINT32_MAX = 0xffffffff
 MMAPPER_MAGIC = 0xffb2af01
 MMAPPER_VERSIONS = (031, 040, 041, 042)
-UINT_MAX = 0xffffffff
 
 
 class MMapperException(Exception):
@@ -70,10 +71,11 @@ mobflags = NamedBitFlags([
 	("clericguild", 10),
 	("warriorguild", 11),
 	("rangerguild", 12),
-	("smob", 13),
+	("smob", 13), # Aggressive mob.
 	("quest", 14),
-	("any", 15),
-	("reserved2", 16)])
+	("any", 15), # Peaseful mob.
+	("reserved2", 16)
+])
 
 loadflags = NamedBitFlags([
 	("treasure", 1),
@@ -91,7 +93,10 @@ loadflags = NamedBitFlags([
 	("warg", 13),
 	("boat", 14),
 	("attention", 15),
-	("tower", 16)])
+	("tower", 16), # Player can 'watch' surrounding rooms from this one.
+	("clock", 17),
+	("mail", 18)
+])
 
 exitflags = NamedBitFlags([
 	("exit", 1),
@@ -102,7 +107,10 @@ exitflags = NamedBitFlags([
 	("special", 6),
 	("no_match", 7),
 	("flow", 8),
-	("no_flee", 9)
+	("no_flee", 9),
+	("damage", 10),
+	("fall", 11),
+	("guarded", 12)
 ])
 
 doorflags = NamedBitFlags([
@@ -164,23 +172,24 @@ sundeath_type = {
 	2: "nosundeath"}
 
 terrain_type = {
-	0: "UNDEFINED",
-	1: "INDOORS",
-	2: "CITY",
-	3: "FIELD",
-	4: "FOREST",
-	5: "HILLS",
-	6: "MOUNTAINS",
-	7: "SHALLOWWATER",
-	8: "WATER",
-	9: "RAPIDS",
-	10: "UNDERWATER",
-	11: "ROAD",
-	12: "BRUSH",
-	13: "TUNNEL",
-	14: "CAVERN",
-	15: "DEATH",
-	16: "RANDOM"}
+	0: "undefined",
+	1: "indoors",
+	2: "city",
+	3: "field",
+	4: "forest",
+	5: "hills",
+	6: "mountains",
+	7: "shallowwater",
+	8: "water",
+	9: "rapids",
+	10: "underwater",
+	11: "road",
+	12: "brush",
+	13: "tunnel",
+	14: "cavern",
+	15: "death",
+	16: "random"
+}
 
 
 def read_uint32(infileobj):
@@ -227,7 +236,7 @@ def read_int8(infileobj):
 
 def read_qstring(infileobj):
 	length = read_uint32(infileobj)
-	if length == UINT_MAX:
+	if length == UINT32_MAX:
 		return ""
 	ucs_data = infileobj.read(length)
 	if len(ucs_data) != length:
@@ -252,15 +261,15 @@ def read_exit(version, infileobj):
 			new_exit.door = "exit"
 	# Inbound connections are unneeded.
 	connection = read_uint32(infileobj)
-	while connection != UINT_MAX:
+	while connection != UINT32_MAX:
 		connection = read_uint32(infileobj)
 	outConnections = []
 	connection = read_uint32(infileobj)
-	while connection != UINT_MAX:
+	while connection != UINT32_MAX:
 		outConnections.append(str(connection))
 		connection = read_uint32(infileobj)
 	if not outConnections:
-		new_exit.to = "UNDEFINED"
+		new_exit.to = "undefined"
 	else:
 		# We want the last outbound connection.
 		new_exit.to = outConnections[-1]
@@ -269,7 +278,7 @@ def read_exit(version, infileobj):
 
 def read_exits(version, infileobj):
 	exits = []
-	exit_names = ["north", "south", "east", "west", "up", "down", "unknown"]
+	exit_names = ("north", "south", "east", "west", "up", "down", "unknown")
 	for exit_name in exit_names:
 		new_exit = read_exit(version, infileobj)
 		if new_exit.exitFlags:
@@ -321,10 +330,10 @@ def read_mark(version, infileobj):
 		# QDate objects don't have a year 0.
 		jd = None
 	ms = read_uint32(infileobj) # Milliseconds since midnight
-	if ms == UINT_MAX:
+	if ms == UINT32_MAX:
 		ms = None
 	tz = read_uint8(infileobj) # 0 = local time, 1 = UTC
-	if tz == 0xff:
+	if tz == UINT8_MAX:
 		tz = None
 	mark.time_stamp = jd2gcal(jd, ms, tz)
 	mark.type = info_mark_type[read_uint8(infileobj)]
@@ -380,12 +389,8 @@ def read_mmapper_data(filename):
 	for i in xrange(rooms_count):
 		room = read_room(version, decompressed_stream)
 		data.rooms[room.id] = room
-	if version >= 042:
-		# Reading marks are broken in V042 of the database format. Will need to look into this.
-		return data
 	for i in xrange(marks_count):
 		data.marks.append(read_mark(version, decompressed_stream))
-		# Do we want the marks?  How do they work, exactly?
 	return data
 
 
