@@ -95,7 +95,8 @@ loadflags = NamedBitFlags([
 	("attention", 15),
 	("tower", 16), # Player can 'watch' surrounding rooms from this one.
 	("clock", 17),
-	("mail", 18)
+	("mail", 18),
+	("stable", 19)
 ])
 
 exitflags = NamedBitFlags([
